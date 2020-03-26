@@ -19,76 +19,86 @@ class _PageTurningDemo1 extends State<PageTurningDemo1> {
     ));
   }
 
-  static Offset offset;
+  static Offset offset; // move offset
   static Offset a, b, c, d, e, f, g, h, i, j, k; // 各位置见原理图
 
   @override
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
-    print('MediaQuery size ${size}');
+    // print('MediaQuery size ${size}');
     return GestureDetector(
       onPanDown: (DragDownDetails _) {
-        offset = Offset(0, 0);
+        if (_.globalPosition.dy > size.height / 2) {
+          MyPageTurn.initPosition = POSITION.BOTTOM_RIGHT;
+        } else {
+          MyPageTurn.initPosition = POSITION.TOP_RIGHT;
+        }
       },
       onPanUpdate: (DragUpdateDetails _) {
-        print('onPanDown delta= ${_.delta}');
-        offset += _.delta;
         setState(() {
           offset = _.globalPosition;
         });
       },
       onPanEnd: (DragEndDetails _) {
-        print('onPanEnd velocity= ${_.velocity}');
-
         setState(() {
-          offset = Offset(0, 0);
+          // offset = Offset.zero;
         });
       },
-      child: Container(
-        width: size.width,
-        height: size.height,
-        decoration: BoxDecoration(
-          color: Color(0x77cdb175),
-        ),
-        child: Stack(
-          children: <Widget>[
-            // CustomPaint(
-            //   size: size,
-            //   painter: MyPainter(),
-            // ),
-            CustomPaint(
-              size: size,
-              painter: MyPageTurn(offset: offset),
-            ),
-          ],
-        ),
+      child: CustomPaint(
+        size: size,
+        painter: MyPageTurn(offset: offset),
       ),
     );
   }
 }
 
+enum POSITION { TOP_RIGHT, BOTTOM_RIGHT }
+
 class MyPageTurn extends CustomPainter {
+  MyPageTurn({
+    @required this.offset,
+  }) {
+    pathA = new Path();
+    pathB = new Path();
+    pathC = new Path();
+    paintA = new Paint();
+  }
   final Offset offset;
-  MyPageTurn({@required this.offset});
 
   static Offset a, f, g, e, h, c, j, b, k, d, i; // points
+  static Canvas canvas;
+  static Size size;
+  static POSITION initPosition;
+
+  /// path
+  static Path pathA;
+  static Path pathB;
+  static Path pathC;
+
+  /// paint
+  static Paint paintA;
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return true;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    Paint paint = new Paint()
-      ..color = Colors.greenAccent
-      ..blendMode = BlendMode.dstATop
-      ..isAntiAlias = true;
+    MyPageTurn.canvas = canvas;
+    MyPageTurn.size = size;
+    a = offset ?? Offset(0, 0);
+    if (initPosition == POSITION.BOTTOM_RIGHT) {
+      f = Offset(size.width, size.height);
+    } else {
+      f = Offset(size.width, 0);
+    }
 
-    a = offset ?? Offset.zero;
-    f = Offset(size.width, size.height);
     g = Offset((f.dx + a.dx) / 2, (f.dy + a.dy) / 2);
-    e = Offset(g.dx - (pow(f.dx, 2) / f.dx - g.dx), f.dy); // 证明过程见图示
-    h = Offset(f.dx, g.dy - (pow(f.dy, 2) / f.dy - g.dy)); // 有e同理可证得到点
+    e = Offset(g.dx - pow(f.dy - g.dy, 2) / (f.dx - g.dx), f.dy); // 证明过程见图示
+    h = Offset(f.dx, g.dy - pow(f.dx - g.dx, 2) / (f.dy - g.dy)); // 有e同理可证得到点
     c = Offset(e.dx - (f.dx - e.dx) / 2, f.dy); // 选择等分点
+
     j = Offset(f.dx, h.dy - (f.dy - h.dy) / 2);
     b = getIntersectionPoint(LineOffset(a, e), LineOffset(c, j));
     k = getIntersectionPoint(LineOffset(a, h), LineOffset(c, j));
@@ -97,43 +107,68 @@ class MyPageTurn extends CustomPainter {
     i = Offset((j.dx + 2 * h.dx + k.dx) / 4,
         (j.dy + 2 * h.dy + k.dy) / 4); // 设置贝塞尔曲线点i
 
-    canvas.drawPath(drawPathA(size), paint); // draw path
-    // paint..color = Colors.blueAccent;
-    // canvas.drawPath(drawPathB(size), paint); // draw path
-    paint..color = Colors.yellowAccent;
-    canvas.drawPath(drawPathC(size), paint); // draw path
+    // canvas.drawPath(drawPathB(), paintB);
+    // canvas.drawPath(drawPathC(), paintC);
+    // canvas.drawPath(drawPathAFromTopRight(), paintA);
+
+    paintA..color = Colors.blue;
+    canvas.drawPath(drawPathB(), paintA);
+    paintA..color = Colors.yellow;
+    canvas.drawPath(drawPathC(), paintA);
+    paintA..color = Colors.green;
+    if (initPosition == POSITION.TOP_RIGHT) {
+      canvas.drawPath(drawPathAFromTopRight(), paintA);
+    } else {
+      canvas.drawPath(drawPathAFromBottomRight(), paintA);
+    }
   }
 
-  Path drawPathA(Size size) {
-    Path path = new Path();
-    // 移到移动点 准备划出轮廓
-    path.reset();
-    path.lineTo(0, size.height); //移动到左下角
-    path.lineTo(c.dx, c.dy);
-    path.quadraticBezierTo(e.dx, e.dy, b.dx, b.dy); // 第一条曲线
-    path.lineTo(a.dx, a.dy);
-    path.lineTo(k.dx, k.dy);
-    path.quadraticBezierTo(h.dx, h.dy, j.dx, j.dy); // 第二条曲线
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
+  // 右下角翻页
+  Path drawPathAFromBottomRight() {
+    pathA.reset();
+    pathA.lineTo(0, size.height); //移动到左下角
+    pathA.lineTo(c.dx, c.dy);
+    pathA.quadraticBezierTo(e.dx, e.dy, b.dx, b.dy); // 第一条曲线
+    pathA.lineTo(a.dx, a.dy);
+    pathA.lineTo(k.dx, k.dy);
+    pathA.quadraticBezierTo(h.dx, h.dy, j.dx, j.dy); // 第二条曲线
+    pathA.lineTo(size.width, 0);
+    pathA.close();
+    return pathA;
   }
 
-  Path drawPathB(Size size) {
-    Path path = new Path();
-
-    return path;
+  // 右上角翻页
+  Path drawPathAFromTopRight() {
+    pathA.reset();
+    pathA.lineTo(c.dx, c.dy); //移动到c点
+    pathA.quadraticBezierTo(e.dx, e.dy, b.dx, b.dy); //从c到b画贝塞尔曲线，控制点为e
+    pathA.lineTo(a.dx, a.dy); //移动到a点
+    pathA.lineTo(k.dx, k.dy); //移动到k点
+    pathA.quadraticBezierTo(h.dx, h.dy, j.dx, j.dy); //从k到j画贝塞尔曲线，控制点为h
+    pathA.lineTo(size.width, size.height); //移动到右下角
+    pathA.lineTo(0, size.height); //移动到左下角
+    pathA.close();
+    return pathA;
   }
 
-  Path drawPathC(Size size) {
-    Path path = new Path();
-    path.moveTo(d.dx, d.dy);
-    path.lineTo(i.dx, i.dy);
-    path.lineTo(k.dx, k.dy);
-    path.lineTo(a.dx, a.dy);
-    path.moveTo(b.dx, b.dy);
-    path.close();
-    return path;
+  Path drawPathB() {
+    pathB.reset();
+    pathB.lineTo(0, size.height); //移动到左下角
+    pathB.lineTo(size.width, size.height); //移动到右下角
+    pathB.lineTo(size.width, 0); //移动到右上角
+    pathB.close(); //闭合区域
+    return pathB;
+  }
+
+  Path drawPathC() {
+    pathC.reset();
+    pathC.moveTo(i.dx, i.dy);
+    pathC.lineTo(d.dx, d.dy);
+    pathC.lineTo(b.dx, b.dy);
+    pathC.lineTo(a.dx, a.dy);
+    pathC.lineTo(k.dx, k.dy);
+    pathC.close();
+    return pathC;
   }
 
   /// 计算两线段相交点坐标
