@@ -1,7 +1,8 @@
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:vector_math/vector_math_64.dart' as v;
 import 'package:flutter/services.dart';
 
 class PageTurningDemo1 extends StatefulWidget {
@@ -19,20 +20,14 @@ class _PageTurningDemo1 extends State<PageTurningDemo1> {
     ));
   }
 
-  static Offset offset; // move offset
-  static Offset a, b, c, d, e, f, g, h, i, j, k; // 各位置见原理图
+  static Offset offset = Offset.zero; // move offset
 
   @override
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
-    // print('MediaQuery size ${size}');
     return GestureDetector(
       onPanDown: (DragDownDetails _) {
-        if (_.globalPosition.dy > size.height / 2) {
-          MyPageTurn.initPosition = POSITION.BOTTOM_RIGHT;
-        } else {
-          MyPageTurn.initPosition = POSITION.TOP_RIGHT;
-        }
+        this.handlePanDown(_, size);
       },
       onPanUpdate: (DragUpdateDetails _) {
         setState(() {
@@ -41,7 +36,7 @@ class _PageTurningDemo1 extends State<PageTurningDemo1> {
       },
       onPanEnd: (DragEndDetails _) {
         setState(() {
-          // offset = Offset.zero;
+          offset = Offset.zero;
         });
       },
       child: CustomPaint(
@@ -50,25 +45,65 @@ class _PageTurningDemo1 extends State<PageTurningDemo1> {
       ),
     );
   }
+
+  void handlePanDown(DragDownDetails _, Size size) {
+    double boxW = size.width / 3;
+    double boxH = size.height / 3;
+    double dx = _.globalPosition.dx;
+    double dy = _.globalPosition.dy;
+    if (dy > 2 * boxH && dx > boxW) {
+      MyPageTurn.initPosition = POSITION_STYLE.BOTTOM_RIGHT;
+    } else if (dy < boxH && dx > boxW) {
+      MyPageTurn.initPosition = POSITION_STYLE.TOP_RIGHT;
+    } else if (dy > boxH && dy < 2 * boxH && dx > boxW && dx < 2 * boxW) {
+      MyPageTurn.initPosition = POSITION_STYLE.MID;
+    } else if (dy > boxH && dy < 2 * boxH && dx > 2 * boxW) {
+      MyPageTurn.initPosition = POSITION_STYLE.RIGHT;
+    } else {
+      MyPageTurn.initPosition = POSITION_STYLE.LEFT;
+    }
+    print('click POSITION_STYLE =${MyPageTurn.initPosition}');
+  }
 }
 
-enum POSITION { TOP_RIGHT, BOTTOM_RIGHT }
+enum POSITION_STYLE { TOP_RIGHT, BOTTOM_RIGHT, LEFT, RIGHT, MID }
 
 class MyPageTurn extends CustomPainter {
   MyPageTurn({
     @required this.offset,
   }) {
+    assert(this.offset != null);
+    // Path
     pathA = new Path();
     pathB = new Path();
     pathC = new Path();
-    paintA = new Paint();
+    // paint
+    paintA = new Paint()
+      ..isAntiAlias = true
+      ..color = Colors.green;
+    paintB = new Paint()
+      ..blendMode = BlendMode.dstATop
+      ..isAntiAlias = true
+      ..color = Colors.blue;
+    paintC = new Paint()
+      ..color = Colors.yellow
+      ..isAntiAlias = true
+      ..blendMode = BlendMode.dstATop;
+    paintBg = new Paint()..color = Colors.orangeAccent;
+    // canvasBitMap
+    this.newPicRecorder();
   }
+
   final Offset offset;
 
   static Offset a, f, g, e, h, c, j, b, k, d, i; // points
-  static Canvas canvas;
+  // static Canvas canvas;
   static Size size;
-  static POSITION initPosition;
+  static POSITION_STYLE initPosition;
+
+  // canvas
+  static Canvas canvasBitMap;
+  static ui.PictureRecorder picRecorder;
 
   /// path
   static Path pathA;
@@ -77,81 +112,196 @@ class MyPageTurn extends CustomPainter {
 
   /// paint
   static Paint paintA;
+  static Paint paintB;
+  static Paint paintC;
+  static Paint paintBg;
 
+  // repaint
   @override
   bool shouldRepaint(CustomPainter oldDelegate) {
+    /// 点击中间区域不绘画
+    return POSITION_STYLE.MID != initPosition;
+  }
+
+  /// 计算c点有没有超出区域
+  bool calcPointC() {
+    // reset
+    if (offset == Offset.zero || (-1 == offset.dx && -1 == offset.dy)) {
+      a = Offset(-1, -1);
+      initPosition = POSITION_STYLE.TOP_RIGHT;
+      f = Offset(size.width, 0);
+      return true;
+    }
+
+    a = offset;
+    if (initPosition == POSITION_STYLE.BOTTOM_RIGHT) {
+      f = Offset(size.width, size.height);
+    } else if (initPosition == POSITION_STYLE.TOP_RIGHT) {
+      f = Offset(size.width, 0);
+    } else {
+      a = Offset(offset.dx, size.height - 1);
+      f = Offset(size.width, size.height);
+    }
+
+    g = Offset((f.dx + a.dx) / 2, (f.dy + a.dy) / 2);
+    e = Offset(g.dx - pow(f.dy - g.dy, 2) / (f.dx - g.dx), f.dy);
+    c = Offset(e.dx - (f.dx - e.dx) / 2, f.dy);
+
+    if (c.dx < 1) {
+      double w0 = size.width - c.dx;
+      double w1 = (f.dx - a.dx).abs();
+      double w2 = size.width * w1 / w0;
+      double h1 = (f.dy - a.dy).abs();
+      double h2 = w2 * h1 / w1;
+      a = Offset((f.dx - w2).abs(), (f.dy - h2).abs());
+    }
     return true;
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    MyPageTurn.canvas = canvas;
+    canvas.saveLayer(Rect.fromLTRB(0, 0, size.width, size.height), paintBg);
+    // MyPageTurn.canvas = canvas;
     MyPageTurn.size = size;
-    a = offset ?? Offset(0, 0);
-    if (initPosition == POSITION.BOTTOM_RIGHT) {
-      f = Offset(size.width, size.height);
-    } else {
-      f = Offset(size.width, 0);
+
+    calcPointC();
+    calcAllPioints();
+
+    drawPathA(canvas);
+    drawPathC(canvas);
+    drawPathB(canvas);
+    canvas.restore();
+  }
+
+  ///利用 Paragraph 实现 _drawText
+  void _drawText(
+      Canvas canvas, String text, Color color, double width, Offset offset,
+      {TextAlign textAlign = TextAlign.start, double fontSize}) {
+    ui.ParagraphBuilder pb = ui.ParagraphBuilder(ui.ParagraphStyle(
+      textAlign: textAlign,
+      fontSize: fontSize,
+      fontStyle: FontStyle.normal,
+    ));
+    pb.pushStyle(ui.TextStyle(color: Colors.black, fontSize: 16.0));
+    pb.addText(text);
+    ui.ParagraphConstraints pc = ui.ParagraphConstraints(width: width);
+
+    ///这里需要先layout, 后面才能获取到文字高度
+    ui.Paragraph paragraph = pb.build()..layout(pc);
+    canvas.drawParagraph(paragraph, offset);
+  }
+
+  void newPicRecorder() {
+    picRecorder = ui.PictureRecorder();
+    canvasBitMap = Canvas(picRecorder);
+  }
+
+  void drawPathA(Canvas canvas) {
+    canvas.save();
+    this.newPicRecorder();
+    canvasBitMap.drawPath(getPathA(), paintA);
+    _drawText(
+        canvasBitMap,
+        "drawPathA三日前，他帮宗门下山取灵药，却被敌对宗门的高手偷袭，他拼死守护灵药，九死一生回到宗门，丹田却被打碎，成为一个不折不扣的废物。",
+        Colors.black,
+        size.width,
+        Offset.zero,
+        fontSize: 16.0);
+
+    ui.Picture pic = picRecorder.endRecording();
+    canvas.clipPath(getPathA());
+
+    canvas.drawPicture(pic);
+    canvas.restore();
+  }
+
+  void drawPathB(Canvas canvas) {
+    canvas.save();
+    this.newPicRecorder();
+    canvasBitMap.drawPath(getPathB(), paintB);
+    _drawText(
+        canvasBitMap,
+        "drawPathB三日前，他帮宗门下山取灵药，却被敌对宗门的高手偷袭，他拼死守护灵药，九死一生回到宗门，丹田却被打碎，成为一个不折不扣的废物drawPathB。",
+        Colors.black,
+        size.width,
+        Offset(0, size.height - 100),
+        fontSize: 16.0);
+    ui.Picture pic = picRecorder.endRecording();
+    canvas.clipPath(getPathB());
+    canvas.drawPicture(pic);
+    canvas.restore();
+  }
+
+  void drawPathC(Canvas canvas) {
+    Path pathC = getPathC();
+
+    /// 生成背面文字
+    canvas.drawPath(pathC, paintC);
+    canvas.save();
+    this.newPicRecorder();
+    canvasBitMap.drawPath(_getDefaultPath(), paintC);
+    _drawText(
+      canvasBitMap,
+      "drawPathC三日前，他帮宗门下山取灵药，却被敌对宗门的高手偷袭，他拼死守护灵药，九死一生回到宗门，丹田却被打碎，成为一个不折不扣的废物drawPathC。",
+      Colors.black,
+      size.width,
+      Offset.zero,
+      fontSize: 16.0,
+    );
+    ui.Picture pic = picRecorder.endRecording();
+    canvas.clipPath(pathC);
+
+    double eh = _hypot(f.dx - e.dx, h.dy - f.dy);
+    double sin0 = (f.dx - e.dx) / eh;
+    double cos0 = (h.dy - f.dy) / eh;
+    
+    //设置翻转和旋转矩阵
+    Matrix4 mMatrix = Matrix4.columns(
+      v.Vector4(-(1 - 2 * sin0 * sin0), 2 * sin0 * cos0, 0, 0),
+      v.Vector4(2 * sin0 * cos0, (1 - 2 * sin0 * sin0), 0, 0),
+      v.Vector4(0, 0, 1, 0),
+      v.Vector4(0, 0, 0, 1),
+    );
+
+    canvas.translate(e.dx, e.dy);
+    mMatrix.translate(-e.dx, -e.dy);
+    canvas.transform(mMatrix.storage);
+
+    canvas.drawPicture(pic); // draw
+    canvas.restore();
+  }
+
+// 阴影left
+  Path drawShadowLeft() {
+    pathC
+      ..reset()
+      ..moveTo(c.dx, c.dy)
+      ..lineTo(j.dx, j.dy)
+      ..close();
+    return pathC;
+  }
+
+// 阴影right
+  Path drawShadowRight() {
+    pathB
+      ..reset()
+      ..moveTo(e.dx, e.dy)
+      ..lineTo(h.dx, h.dy)
+      ..close();
+    return pathB;
+  }
+
+  Path getPathA() {
+    switch (initPosition) {
+      case POSITION_STYLE.TOP_RIGHT:
+        return getPathAByTopRight();
+        break;
+      default:
     }
-
-    g = Offset((f.dx + a.dx) / 2, (f.dy + a.dy) / 2);
-    e = Offset(g.dx - pow(f.dy - g.dy, 2) / (f.dx - g.dx), f.dy); // 证明过程见图示
-    h = Offset(f.dx, g.dy - pow(f.dx - g.dx, 2) / (f.dy - g.dy)); // 有e同理可证得到点
-    c = Offset(e.dx - (f.dx - e.dx) / 2, f.dy); // 选择等分点
-
-    j = Offset(f.dx, h.dy - (f.dy - h.dy) / 2);
-    b = getIntersectionPoint(LineOffset(a, e), LineOffset(c, j));
-    k = getIntersectionPoint(LineOffset(a, h), LineOffset(c, j));
-    d = Offset((c.dx + 2 * e.dx + b.dx) / 4,
-        (c.dy + 2 * e.dy + b.dy) / 4); // 设置贝塞尔曲线点d
-    i = Offset((j.dx + 2 * h.dx + k.dx) / 4,
-        (j.dy + 2 * h.dy + k.dy) / 4); // 设置贝塞尔曲线点i
-
-    // canvas.drawPath(drawPathB(), paintB);
-    // canvas.drawPath(drawPathC(), paintC);
-    // canvas.drawPath(drawPathAFromTopRight(), paintA);
-
-    paintA..color = Colors.blue;
-    canvas.drawPath(drawPathB(), paintA);
-    paintA..color = Colors.yellow;
-    canvas.drawPath(drawPathC(), paintA);
-    paintA..color = Colors.green;
-    if (initPosition == POSITION.TOP_RIGHT) {
-      canvas.drawPath(drawPathAFromTopRight(), paintA);
-    } else {
-      canvas.drawPath(drawPathAFromBottomRight(), paintA);
-    }
+    return getPathAByBottomRight();
   }
 
-  // 右下角翻页
-  Path drawPathAFromBottomRight() {
-    pathA.reset();
-    pathA.lineTo(0, size.height); //移动到左下角
-    pathA.lineTo(c.dx, c.dy);
-    pathA.quadraticBezierTo(e.dx, e.dy, b.dx, b.dy); // 第一条曲线
-    pathA.lineTo(a.dx, a.dy);
-    pathA.lineTo(k.dx, k.dy);
-    pathA.quadraticBezierTo(h.dx, h.dy, j.dx, j.dy); // 第二条曲线
-    pathA.lineTo(size.width, 0);
-    pathA.close();
-    return pathA;
-  }
-
-  // 右上角翻页
-  Path drawPathAFromTopRight() {
-    pathA.reset();
-    pathA.lineTo(c.dx, c.dy); //移动到c点
-    pathA.quadraticBezierTo(e.dx, e.dy, b.dx, b.dy); //从c到b画贝塞尔曲线，控制点为e
-    pathA.lineTo(a.dx, a.dy); //移动到a点
-    pathA.lineTo(k.dx, k.dy); //移动到k点
-    pathA.quadraticBezierTo(h.dx, h.dy, j.dx, j.dy); //从k到j画贝塞尔曲线，控制点为h
-    pathA.lineTo(size.width, size.height); //移动到右下角
-    pathA.lineTo(0, size.height); //移动到左下角
-    pathA.close();
-    return pathA;
-  }
-
-  Path drawPathB() {
+  Path _getDefaultPath() {
     pathB.reset();
     pathB.lineTo(0, size.height); //移动到左下角
     pathB.lineTo(size.width, size.height); //移动到右下角
@@ -160,15 +310,75 @@ class MyPageTurn extends CustomPainter {
     return pathB;
   }
 
-  Path drawPathC() {
-    pathC.reset();
-    pathC.moveTo(i.dx, i.dy);
-    pathC.lineTo(d.dx, d.dy);
-    pathC.lineTo(b.dx, b.dy);
-    pathC.lineTo(a.dx, a.dy);
-    pathC.lineTo(k.dx, k.dy);
+  // 右下角翻页
+  Path getPathAByBottomRight() {
+    pathA
+      ..reset()
+      ..lineTo(0, size.height) //移动到左下角
+      ..lineTo(c.dx, c.dy)
+      ..quadraticBezierTo(e.dx, e.dy, b.dx, b.dy) // 第一条曲线
+      ..lineTo(a.dx, a.dy)
+      ..lineTo(k.dx, k.dy)
+      ..quadraticBezierTo(h.dx, h.dy, j.dx, j.dy) // 第二条曲线
+      ..lineTo(size.width, 0)
+      ..close();
+    return pathA;
+  }
+
+  // 右上角翻页
+  Path getPathAByTopRight() {
+    pathA
+      ..reset()
+      ..lineTo(c.dx, c.dy) //移动到c点
+      ..quadraticBezierTo(e.dx, e.dy, b.dx, b.dy) //从c到b画贝塞尔曲线，控制点为e
+      ..lineTo(a.dx, a.dy) //移动到a点
+      ..lineTo(k.dx, k.dy) //移动到k点
+      ..quadraticBezierTo(h.dx, h.dy, j.dx, j.dy) //从k到j画贝塞尔曲线，控制点为h
+      ..lineTo(size.width, size.height) //移动到右下角
+      ..lineTo(0, size.height) //移动到左下角
+      ..close();
+    return pathA;
+  }
+
+  Path getPathB() {
+    pathB
+      ..reset()
+      ..lineTo(0, size.height) //移动到左下角
+      ..lineTo(size.width, size.height) //移动到右下角
+      ..lineTo(size.width, 0) //移动到右上角
+      ..close(); //闭合区域
+    Path pAB = Path.combine(PathOperation.union, getPathA(), getPathC());
+    Path pn = Path.combine(PathOperation.reverseDifference, pAB, pathB);
+    return pn;
+  }
+
+  Path getPathC() {
+    pathC
+      ..reset()
+      ..moveTo(i.dx, i.dy)
+      ..lineTo(d.dx, d.dy)
+      ..lineTo(b.dx, b.dy)
+      ..lineTo(a.dx, a.dy)
+      ..lineTo(k.dx, k.dy);
     pathC.close();
-    return pathC;
+    return Path.combine(PathOperation.difference, pathC, getPathA());
+  }
+
+  num _hypot(num x, num y) {
+    var first = x.abs();
+    var second = y.abs();
+
+    if (y > x) {
+      first = y.abs();
+      second = x.abs();
+    }
+
+    if (first == 0.0) {
+      return second;
+    }
+
+    final t = second / first;
+    return first * sqrt(1 + t * t);
   }
 
   /// 计算两线段相交点坐标
@@ -197,6 +407,21 @@ class MyPageTurn extends CustomPainter {
             ((y1 - y2) * (x3 - x4) - (x1 - x2) * (y3 - y4));
 
     return Offset(dx, dy);
+  }
+
+  /// 计算所有位置
+  void calcAllPioints() {
+    g = Offset((f.dx + a.dx) / 2, (f.dy + a.dy) / 2);
+    e = Offset(g.dx - pow(f.dy - g.dy, 2) / (f.dx - g.dx), f.dy); // 证明过程见图示
+    h = Offset(f.dx, g.dy - pow(f.dx - g.dx, 2) / (f.dy - g.dy)); // 有e同理可证得到点
+    c = Offset(e.dx - (f.dx - e.dx) / 2, f.dy); // 选择等分点
+    j = Offset(f.dx, h.dy - (f.dy - h.dy) / 2);
+    b = getIntersectionPoint(LineOffset(a, e), LineOffset(c, j));
+    k = getIntersectionPoint(LineOffset(a, h), LineOffset(c, j));
+    d = Offset((c.dx + 2 * e.dx + b.dx) / 4,
+        (c.dy + 2 * e.dy + b.dy) / 4); // 设置贝塞尔曲线点d
+    i = Offset((j.dx + 2 * h.dx + k.dx) / 4,
+        (j.dy + 2 * h.dy + k.dy) / 4); // 设置贝塞尔曲线点i
   }
 }
 
