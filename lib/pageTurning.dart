@@ -71,8 +71,12 @@ enum POSITION_STYLE { TOP_RIGHT, BOTTOM_RIGHT, LEFT, RIGHT, MID }
 class MyPageTurn extends CustomPainter {
   MyPageTurn({
     @required this.offset,
+    this.bgColor,
   }) {
     assert(this.offset != null);
+    // bg Color
+    bgColorSave = bgColor ?? Color(0x77cdb175);
+
     // Path
     pathA = new Path();
     pathB = new Path();
@@ -80,27 +84,30 @@ class MyPageTurn extends CustomPainter {
     // paint
     paintA = new Paint()
       ..isAntiAlias = true
-      ..color = Color(0x77cdb175);
-    paintB = new Paint()
-      ..blendMode = BlendMode.dstATop
-      ..isAntiAlias = true
-      ..color = Color(0x77cdb175);
-    paintC = new Paint()
-      ..color = Color(0x77cdb175)
-      ..isAntiAlias = true
-      ..blendMode = BlendMode.dstATop;
-    paintBg = new Paint()..color = Colors.orangeAccent;
+      ..color = bgColorSave;
+    paintBg = new Paint();
+    paintShadow = new Paint();
     // canvasBitMap
     this.newPicRecorder();
   }
 
+  /// final
   final Offset offset;
+  final Color bgColor;
 
+  /// static
+  /// offset(pos)
   static Offset a, f, g, e, h, c, j, b, k, d, i; // points
-  // static Canvas canvas;
+  // Canvas canvas;
   static Size size;
+  // defalutBgColor
+  static Color bgColorSave;
+
+  /// POSITION STYLE
   static POSITION_STYLE initPosition;
 
+  /// viewDiagonalLength
+  num viewDiagonalLength;
   // canvas
   static Canvas canvasBitMap;
   static ui.PictureRecorder picRecorder;
@@ -112,16 +119,15 @@ class MyPageTurn extends CustomPainter {
 
   /// paint
   static Paint paintA;
-  static Paint paintB;
-  static Paint paintC;
   static Paint paintBg;
+  static Paint paintShadow;
 
   /// dis
   ///A区域左阴影矩形短边长度参考值
-  double lPathAShadowDis = 0;
+  double lPathAShadowDis = 12.0;
 
   /// A区域右阴影矩形短边长度参考值
-  double rPathAShadowDis = 0;
+  double rPathAShadowDis = 12.0;
 
   // repaint
   @override
@@ -169,6 +175,11 @@ class MyPageTurn extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Rect.fromLTRB(0, 0, size.width, size.height), paintBg);
     // MyPageTurn.canvas = canvas;
+    viewDiagonalLength = _getDistance(
+      Offset.zero,
+      Offset(size.width, size.height),
+    ); //view对角线长度
+    /// [size]
     MyPageTurn.size = size;
 
     calcPointC();
@@ -189,12 +200,15 @@ class MyPageTurn extends CustomPainter {
       fontSize: fontSize,
       fontStyle: FontStyle.normal,
     ));
-    pb.pushStyle(ui.TextStyle(color: color ?? Colors.black87, fontSize: 16.0));
+    pb.pushStyle(ui.TextStyle(
+      color: color ?? Colors.black87,
+      fontSize: 16.0,
+    ));
     pb.addText(text);
-    ui.ParagraphConstraints pc = ui.ParagraphConstraints(width: width);
 
     ///这里需要先layout, 后面才能获取到文字高度
-    ui.Paragraph paragraph = pb.build()..layout(pc);
+    ui.Paragraph paragraph = pb.build()
+      ..layout(ui.ParagraphConstraints(width: width));
     canvas.drawParagraph(paragraph, offset);
   }
 
@@ -206,44 +220,52 @@ class MyPageTurn extends CustomPainter {
   void drawPathA(Canvas canvas) {
     canvas.save();
     this.newPicRecorder();
+    paintA..color = bgColorSave;
     canvasBitMap.drawPath(getPathA(), paintA);
-    _drawText(canvasBitMap, "这是阅读页内容AAA", Colors.black, size.width,
-        Offset(size.width / 2, size.height - 100),
-        fontSize: 16.0);
+    _drawText(
+      canvasBitMap,
+      "这是阅读页内容AAA",
+      Colors.black,
+      size.width,
+      Offset(size.width / 2, size.height - 100),
+      fontSize: 16.0,
+    );
 
     ui.Picture pic = picRecorder.endRecording();
     canvas.clipPath(pathA);
-    canvas.drawPicture(pic);
 
+    canvas.drawPicture(pic);
     drawPathALeftShadow(canvas, pathA);
     drawPathARightShadow(canvas, pathA);
-
     canvas.restore();
   }
 
   void drawPathB(Canvas canvas) {
     canvas.save();
     this.newPicRecorder();
-    canvasBitMap.drawPath(getPathB(), paintB);
-    _drawText(canvasBitMap, "这是下一页内容BBB", Colors.black, size.width,
-        Offset(size.width / 2, size.height - 100),
-        fontSize: 16.0);
-    ui.Picture pic = picRecorder.endRecording();
-    canvas.clipPath(getPathB());
-    canvas.drawPicture(pic);
+    paintA..color = bgColorSave;
+    canvasBitMap.drawPath(getPathB(), paintA);
+    _drawText(
+      canvasBitMap,
+      "这是下一页内容BBB",
+      Colors.black,
+      size.width,
+      Offset(size.width / 2, size.height - 100),
+      fontSize: 16.0,
+    );
+    canvas.clipPath(pathB);
+    canvas.drawPicture(picRecorder.endRecording());
     this.drawPathBShadow(canvas);
     canvas.restore();
   }
 
   void drawPathC(Canvas canvas) {
-    Path pathC = getPathC();
-
     /// 生成背面文字
-    canvas.drawPath(pathC, paintC);
+    paintA..color = Color.alphaBlend(bgColorSave, Colors.white);
+    canvas.drawPath(getPathC(), paintA);
     canvas.save();
     this.newPicRecorder();
-    paintC..color = Color(0x66cdb175);
-    canvasBitMap.drawPath(_getDefaultPath(), paintC);
+    canvasBitMap.drawPath(_getDefaultPath(), paintA);
     _drawText(
       canvasBitMap,
       "这是阅读页内容AAA",
@@ -282,7 +304,7 @@ class MyPageTurn extends CustomPainter {
 
     var gradientColors = [
       Colors.transparent,
-      Colors.black38,
+      Colors.black26,
     ];
 
     double left;
@@ -293,41 +315,43 @@ class MyPageTurn extends CustomPainter {
     if (initPosition == POSITION_STYLE.TOP_RIGHT) {
       left = (e.dx - lPathAShadowDis);
       right = (e.dx);
-      gradient = ui.Gradient.linear(
-          Offset(left, top), Offset(right, top), gradientColors);
     } else {
-      left = (e.dx);
-      right = (e.dx + lPathAShadowDis);
-
-      gradient = ui.Gradient.linear(
-          Offset(right, top), Offset(left, top), gradientColors);
+      right = (e.dx);
+      left = (e.dx + lPathAShadowDis);
     }
-    Paint paint = new Paint()..shader = gradient;
+
+    gradient = ui.Gradient.linear(
+      Offset(left, top),
+      Offset(right, top),
+      gradientColors,
+    );
+    paintShadow..shader = gradient;
 
     //裁剪出我们需要的区域
     Path mPath = new Path();
-    mPath.moveTo(a.dx - max(rPathAShadowDis, lPathAShadowDis), a.dy);
-    mPath.lineTo(d.dx, d.dy);
-    mPath.lineTo(e.dx, e.dy);
-    mPath.lineTo(a.dx, a.dy);
-    mPath.close();
-    var pn = Path.combine(PathOperation.intersect, pathA, mPath);
-    canvas.clipPath(pn);
+    mPath
+      ..reset()
+      ..moveTo(a.dx - max(rPathAShadowDis, lPathAShadowDis), a.dy)
+      ..lineTo(d.dx, d.dy)
+      ..lineTo(e.dx, e.dy)
+      ..lineTo(a.dx, a.dy)
+      ..close();
+    this.newPicRecorder();
+    canvasBitMap
+      ..clipPath(Path.combine(PathOperation.intersect, pathA, mPath))
+      ..translate(e.dx, e.dy)
+      ..rotate(atan2(e.dx - a.dx, a.dy - e.dy))
+      ..translate(-e.dx, -e.dy)
+      ..drawRect(Rect.fromLTRB(left, top, right, bottom), paintShadow);
 
-    canvas.translate(e.dx, e.dy);
-    canvas.rotate(atan2(e.dx - a.dx, a.dy - e.dy));
-    canvas.translate(-e.dx, -e.dy);
-    var rect = Rect.fromLTRB(left, top, right, bottom);
-    canvas.drawRect(rect, paint);
+    canvas.drawPicture(picRecorder.endRecording());
   }
 
   void drawPathARightShadow(Canvas canvas, Path pathA) {
     canvas.restore();
     canvas.save();
-    var gradientColors = [Colors.black38, Colors.transparent];
+    var gradientColors = [Colors.black26, Colors.transparent];
 
-    double viewDiagonalLength =
-        _getDistance(Offset.zero, Offset(size.width, size.height)); //view对角线长度
     double left = h.dx;
     double right = (h.dx + viewDiagonalLength * 100);
     double top;
@@ -337,30 +361,30 @@ class MyPageTurn extends CustomPainter {
     if (initPosition == POSITION_STYLE.TOP_RIGHT) {
       top = (h.dy - rPathAShadowDis);
       bottom = h.dy;
-      gradient = ui.Gradient.linear(
-          Offset(left, bottom), Offset(left, top), gradientColors);
     } else {
-      top = h.dy;
-      bottom = (h.dy + rPathAShadowDis);
-
-      gradient = ui.Gradient.linear(
-          Offset(left, top), Offset(left, bottom), gradientColors);
+      bottom = h.dy;
+      top = (h.dy + rPathAShadowDis);
     }
-    Paint paint = new Paint()..shader = gradient;
-
+    gradient = ui.Gradient.linear(
+      Offset(left, top),
+      Offset(left, bottom),
+      gradientColors,
+    );
+    paintShadow..shader = gradient;
     Path mPath = new Path();
-    mPath.moveTo(a.dx - max(rPathAShadowDis, lPathAShadowDis), a.dy);
-    mPath.lineTo(h.dx, h.dy);
-    mPath.lineTo(a.dx, a.dy);
-    mPath.close();
-    var pn = Path.combine(PathOperation.intersect, pathA, mPath);
-    canvas.clipPath(pn);
-
-    canvas.translate(h.dx, h.dy);
-    canvas.rotate(atan2(a.dy - h.dy, a.dx - h.dx));
-    canvas.translate(-h.dx, -h.dy);
-    var rect = Rect.fromLTRB(left, top, right, bottom);
-    canvas.drawRect(rect, paint);
+    mPath
+      ..moveTo(a.dx - max(rPathAShadowDis, lPathAShadowDis), a.dy)
+      ..lineTo(h.dx, h.dy)
+      ..lineTo(a.dx, a.dy)
+      ..close();
+    this.newPicRecorder();
+    canvasBitMap
+      ..clipPath(Path.combine(PathOperation.intersect, pathA, mPath))
+      ..translate(h.dx, h.dy)
+      ..rotate(atan2(a.dy - h.dy, a.dx - h.dx))
+      ..translate(-h.dx, -h.dy)
+      ..drawRect(Rect.fromLTRB(left, top, right, bottom), paintShadow);
+    canvas.drawPicture(picRecorder.endRecording());
   }
 
   void drawPathBShadow(Canvas canvas) {
@@ -369,12 +393,9 @@ class MyPageTurn extends CustomPainter {
       Color(0x00333333),
     ]; //渐变颜色数组
     int elevation = 5;
-    int deepOffset = -15; //深色端的偏移值
-    int lightOffset = 5; //浅色端的偏移值
+    int deepOffset = -5; //深色端的偏移值
+    int lightOffset = 10; //浅色端的偏移值
     double aTof = _getDistance(a, f); //a到f的距离
-    double viewDiagonalLength =
-        _getDistance(Offset.zero, Offset(size.width, size.height)); //view对角线长度
-
     double left;
     double right;
     double top = c.dy;
@@ -385,23 +406,24 @@ class MyPageTurn extends CustomPainter {
       //从左向右线性渐变
       left = (c.dx - deepOffset); //c点位于左上角
       right = (c.dx + aTof / elevation + lightOffset);
-
-      gradient = ui.Gradient.linear(
-          Offset(left, top), Offset(right, top), gradientColors);
     } else {
-      left = (c.dx - aTof / elevation - lightOffset); //c点位于左下角
-      right = (c.dx + deepOffset);
-      gradient = ui.Gradient.linear(
-          Offset(right, top), Offset(left, top), gradientColors);
+      right = (c.dx - aTof / elevation - lightOffset); //c点位于左下角
+      left = (c.dx + deepOffset);
     }
 
-    Paint paint = new Paint()..shader = gradient;
-
-    canvas.translate(c.dx, c.dy);
-    canvas.rotate(atan2(e.dx - f.dx, h.dy - f.dy));
-    canvas.translate(-c.dx, -c.dy);
-    var rect = Rect.fromLTRB(left, top, right, bottom);
-    canvas.drawRect(rect, paint);
+    gradient = ui.Gradient.linear(
+      Offset(left, top),
+      Offset(right, top),
+      gradientColors,
+    );
+    paintShadow..shader = gradient;
+    this.newPicRecorder();
+    canvasBitMap
+      ..translate(c.dx, c.dy)
+      ..rotate(atan2(e.dx - f.dx, h.dy - f.dy))
+      ..translate(-c.dx, -c.dy)
+      ..drawRect(Rect.fromLTRB(left, top, right, bottom), paintShadow);
+    canvas.drawPicture(picRecorder.endRecording());
   }
 
 // 阴影B区域
@@ -410,13 +432,12 @@ class MyPageTurn extends CustomPainter {
     canvas.save();
     List<Color> gradientColors = [
       Color(0x00333333),
-      Color(0xff111111)
+      Color(0xff333333)
     ]; //渐变颜色数组
 
-    int deepOffset = 26; //深色端的偏移值
-    int lightOffset = -10; //浅色端的偏移值
-    num viewDiagonalLength =
-        _getDistance(Offset.zero, Offset(size.width, size.height)); //view对角线长度
+    int deepOffset = 25; //深色端的偏移值s
+    int lightOffset = 0; //浅色端的偏移值
+
     double midpointCe = (c.dx + e.dx) / 2; //ce中点
     double midpointJh = (j.dy + h.dy) / 2; //jh中点
     double minDisToControlPoint =
@@ -430,36 +451,28 @@ class MyPageTurn extends CustomPainter {
     if (initPosition == POSITION_STYLE.TOP_RIGHT) {
       left = (c.dx - lightOffset);
       right = (c.dx + minDisToControlPoint + deepOffset);
-
-      gradient = ui.Gradient.linear(
-          Offset(left, top), Offset(right, top), gradientColors);
     } else {
-      left = (c.dx - minDisToControlPoint - deepOffset);
-      right = (c.dx + lightOffset);
-      gradient = ui.Gradient.linear(
-          Offset(right, top), Offset(left, top), gradientColors);
+      right = (c.dx - minDisToControlPoint - deepOffset);
+      left = (c.dx + lightOffset);
     }
-    Paint paint = new Paint()
-      ..isAntiAlias = true
-      ..shader = gradient;
-    canvas.clipPath(path);
-    canvas.translate(c.dx, c.dy);
-    canvas.rotate(atan2(e.dx - f.dx, h.dy - f.dy));
-    canvas.translate(-c.dx, -c.dy);
-    Rect rect = Rect.fromLTRB(left, top, right, bottom);
-    canvas.drawRect(rect, paint);
+
+    gradient = ui.Gradient.linear(
+      Offset(left, top),
+      Offset(right, top),
+      gradientColors,
+    );
+    paintShadow..shader = gradient;
+    this.newPicRecorder();
+    canvasBitMap
+      ..clipPath(path)
+      ..translate(c.dx, c.dy)
+      ..rotate(atan2(e.dx - f.dx, h.dy - f.dy))
+      ..translate(-c.dx, -c.dy)
+      ..drawRect(Rect.fromLTRB(left, top, right, bottom), paintShadow);
+    canvas.drawPicture(picRecorder.endRecording());
   }
 
-// 阴影right
-  Path drawShadowRight() {
-    pathB
-      ..reset()
-      ..moveTo(e.dx, e.dy)
-      ..lineTo(h.dx, h.dy)
-      ..close();
-    return pathB;
-  }
-
+  /// Path A
   Path getPathA() {
     switch (initPosition) {
       case POSITION_STYLE.TOP_RIGHT:
@@ -517,8 +530,8 @@ class MyPageTurn extends CustomPainter {
       ..lineTo(size.width, 0) //移动到右上角
       ..close(); //闭合区域
     Path pAB = Path.combine(PathOperation.union, getPathA(), getPathC());
-    Path pn = Path.combine(PathOperation.reverseDifference, pAB, pathB);
-    return pn;
+    pathB = Path.combine(PathOperation.reverseDifference, pAB, pathB);
+    return pathB;
   }
 
   Path getPathC() {
@@ -528,9 +541,10 @@ class MyPageTurn extends CustomPainter {
       ..lineTo(d.dx, d.dy)
       ..lineTo(b.dx, b.dy)
       ..lineTo(a.dx, a.dy)
-      ..lineTo(k.dx, k.dy);
-    pathC.close();
-    return Path.combine(PathOperation.difference, pathC, getPathA());
+      ..lineTo(k.dx, k.dy)
+      ..close();
+    pathC = Path.combine(PathOperation.difference, pathC, getPathA());
+    return pathC;
   }
 
   num _getDistance(Offset pointA, Offset pointB) {
@@ -594,20 +608,6 @@ class MyPageTurn extends CustomPainter {
         (c.dy + 2 * e.dy + b.dy) / 4); // 设置贝塞尔曲线点d
     i = Offset((j.dx + 2 * h.dx + k.dx) / 4,
         (j.dy + 2 * h.dy + k.dy) / 4); // 设置贝塞尔曲线点i
-
-    // A shawow
-    // double lA = a.dy - e.dy;
-    // double lB = e.dx - a.dx;
-    // double lC = a.dx * e.dy - e.dx * a.dy;
-    // lPathAShadowDis =
-    //     ((lA * d.dx + lB * d.dy + lC) / (_getDistance(a, e)).abs());
-    lPathAShadowDis = 12.0;
-
-    // double rA = a.dy - h.dy;
-    // double rB = h.dx - a.dx;
-    // double rC = a.dx * h.dy - h.dx * a.dy;
-    // rPathAShadowDis = ((rA * i.dx + rB * i.dy + rC) / _getDistance(a, h)).abs();
-    rPathAShadowDis = 12.0;
   }
 }
 
