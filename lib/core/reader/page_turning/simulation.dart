@@ -1,5 +1,15 @@
-import 'dart:ui' as ui;
 import 'dart:math' show min, max, atan2, sqrt, pow;
+import 'dart:ui'
+    show
+        Canvas,
+        PictureRecorder,
+        ParagraphBuilder,
+        ParagraphStyle,
+        Paragraph,
+        TextStyle,
+        Gradient,
+        ParagraphConstraints,
+        Picture;
 import 'package:vector_math/vector_math_64.dart' as v;
 
 import 'package:flutter/material.dart'
@@ -60,7 +70,7 @@ class Simulation extends CustomPainter {
   num viewDiagonalLength;
   // canvas
   Canvas canvasBitMap;
-  ui.PictureRecorder picRecorder;
+  PictureRecorder picRecorder;
 
   /// path
   Path pathA;
@@ -164,25 +174,25 @@ class Simulation extends CustomPainter {
   void _drawText(
       Canvas canvas, String text, Color color, double width, Offset offset,
       {TextAlign textAlign = TextAlign.start, double fontSize}) {
-    ui.ParagraphBuilder pb = ui.ParagraphBuilder(ui.ParagraphStyle(
+    ParagraphBuilder pb = ParagraphBuilder(ParagraphStyle(
       textAlign: textAlign,
       fontSize: fontSize,
       fontStyle: FontStyle.normal,
     ));
-    pb.pushStyle(ui.TextStyle(
+    pb.pushStyle(TextStyle(
       color: color ?? Colors.black87,
       fontSize: 16.0,
     ));
     pb.addText(text);
 
     ///这里需要先layout, 后面才能获取到文字高度
-    ui.Paragraph paragraph = pb.build()
-      ..layout(ui.ParagraphConstraints(width: width));
+    Paragraph paragraph = pb.build()
+      ..layout(ParagraphConstraints(width: width));
     canvas.drawParagraph(paragraph, offset);
   }
 
   void newPicRecorder() {
-    picRecorder = ui.PictureRecorder();
+    picRecorder = PictureRecorder();
     canvasBitMap = Canvas(picRecorder);
   }
 
@@ -200,7 +210,7 @@ class Simulation extends CustomPainter {
       fontSize: 16.0,
     );
 
-    ui.Picture pic = picRecorder.endRecording();
+    Picture pic = picRecorder.endRecording();
     canvas.clipPath(pathA);
 
     canvas.drawPicture(pic);
@@ -243,7 +253,7 @@ class Simulation extends CustomPainter {
       Offset(viewSize.width / 2, viewSize.height - 100),
       fontSize: 16.0,
     );
-    ui.Picture pic = picRecorder.endRecording();
+    Picture pic = picRecorder.endRecording();
     canvas.clipPath(pathC);
 
     double eh = _getDistance(e, h);
@@ -280,7 +290,7 @@ class Simulation extends CustomPainter {
     double right;
     double top = e.dy;
     double bottom = (e.dy + viewSize.height);
-    ui.Gradient gradient;
+    Gradient gradient;
     if (initPosition == POSITION_STYLE.TOP_RIGHT) {
       left = (e.dx - lPathAShadowDis);
       right = (e.dx);
@@ -289,7 +299,7 @@ class Simulation extends CustomPainter {
       left = (e.dx + lPathAShadowDis);
     }
 
-    gradient = ui.Gradient.linear(
+    gradient = Gradient.linear(
       Offset(left, top),
       Offset(right, top),
       gradientColors,
@@ -326,7 +336,7 @@ class Simulation extends CustomPainter {
     double top;
     double bottom;
 
-    ui.Gradient gradient;
+    Gradient gradient;
     if (initPosition == POSITION_STYLE.TOP_RIGHT) {
       top = (h.dy - rPathAShadowDis);
       bottom = h.dy;
@@ -334,7 +344,7 @@ class Simulation extends CustomPainter {
       bottom = h.dy;
       top = (h.dy + rPathAShadowDis);
     }
-    gradient = ui.Gradient.linear(
+    gradient = Gradient.linear(
       Offset(left, top),
       Offset(left, bottom),
       gradientColors,
@@ -369,7 +379,7 @@ class Simulation extends CustomPainter {
     double right;
     double top = c.dy;
     double bottom = (viewDiagonalLength + c.dy);
-    ui.Gradient gradient;
+    Gradient gradient;
     if (initPosition == POSITION_STYLE.TOP_RIGHT) {
       //f点在右上角
       //从左向右线性渐变
@@ -380,7 +390,7 @@ class Simulation extends CustomPainter {
       left = (c.dx + deepOffset);
     }
 
-    gradient = ui.Gradient.linear(
+    gradient = Gradient.linear(
       Offset(left, top),
       Offset(right, top),
       gradientColors,
@@ -416,7 +426,7 @@ class Simulation extends CustomPainter {
     double right;
     double top = c.dy;
     double bottom = (viewDiagonalLength + c.dy);
-    ui.Gradient gradient;
+    Gradient gradient;
     if (initPosition == POSITION_STYLE.TOP_RIGHT) {
       left = (c.dx - lightOffset);
       right = (c.dx + minDisToControlPoint + deepOffset);
@@ -425,7 +435,7 @@ class Simulation extends CustomPainter {
       left = (c.dx + lightOffset);
     }
 
-    gradient = ui.Gradient.linear(
+    gradient = Gradient.linear(
       Offset(left, top),
       Offset(right, top),
       gradientColors,

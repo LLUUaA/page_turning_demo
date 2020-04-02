@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:flutter/services.dart';
 import './page_turning/simulation.dart' as simulation;
+import './page_turning/cover.dart' as cover;
 
 /// 支持翻页类型
 enum PAGE_TURNING_TYPE { SIMULATION, SLIDE, COVER }
@@ -13,8 +14,6 @@ class MyReader extends StatefulWidget {
 
 class _MyReader extends State<MyReader> {
   _MyReader() {
-    curType = PAGE_TURNING_TYPE.SIMULATION;
-
     /// SystemChrome
     SystemChrome.setEnabledSystemUIOverlays([]);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
@@ -22,14 +21,25 @@ class _MyReader extends State<MyReader> {
       systemNavigationBarColor: Colors.black,
       systemNavigationBarDividerColor: Colors.black,
     ));
+
+    this._init();
   }
   PAGE_TURNING_TYPE curType;
   Offset offset = Offset.zero; // move offset
+  Size viewSize;
   Widget _widget;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  void _init() {
+    curType = PAGE_TURNING_TYPE.COVER;
+    Size physicalSize = window.physicalSize;
+    double pixdelRatio = window.devicePixelRatio;
+    viewSize = Size(
+        physicalSize.width / pixdelRatio, physicalSize.height / pixdelRatio);
   }
 
   @override
@@ -51,11 +61,6 @@ class _MyReader extends State<MyReader> {
 
   /// 仿真翻页widget
   Widget _getSimutationWidget() {
-    Size physicalSize = window.physicalSize;
-    double pixdelRatio = window.devicePixelRatio;
-    Size size = Size(
-        physicalSize.width / pixdelRatio, physicalSize.height / pixdelRatio);
-
     return GestureDetector(
       onPanDown: (DragDownDetails _) {
         simulation.Simulation.handlePanDown(_);
@@ -71,7 +76,7 @@ class _MyReader extends State<MyReader> {
         });
       },
       child: CustomPaint(
-        size: size,
+        size: viewSize,
         painter: simulation.Simulation(offset: offset),
       ),
     );
@@ -86,8 +91,24 @@ class _MyReader extends State<MyReader> {
 
   /// 覆盖翻页widget
   Widget _getCoverWidget() {
-    return Container(
-      child: Text('Cover Widget'),
+    return GestureDetector(
+      onPanDown: (DragDownDetails _) {
+        // simulation.Simulation.handlePanDown(_);
+      },
+      onPanUpdate: (DragUpdateDetails _) {
+        setState(() {
+          offset = _.globalPosition;
+        });
+      },
+      onPanEnd: (DragEndDetails _) {
+        setState(() {
+          offset = Offset.zero;
+        });
+      },
+      child: CustomPaint(
+        size: viewSize,
+        painter: cover.Cover(offset: offset),
+      ),
     );
   }
 }
