@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 
 class Cover extends CustomPainter {
   Cover({@required this.offset, this.bgColor}) {
-    paintCurr = new Paint()
-      ..color = this.bgColor ?? Colors.blue
-      ..blendMode = BlendMode.dstATop;
-    paintNext = new Paint()
-      ..color = this.bgColor ?? Colors.green
-      ..blendMode = BlendMode.dstATop;
+    paintCurr = new Paint()..color = this.bgColor ?? Colors.blue;
+    // ..blendMode = BlendMode.dstATop;
+    paintNext = new Paint()..color = this.bgColor ?? Colors.green;
+    // ..blendMode = BlendMode.dstATop;
     paintBg = new Paint();
 
     /// _path
@@ -66,9 +64,10 @@ class Cover extends CustomPainter {
     _canvas.save();
     this._newPicRecorder();
     canvasBitMap.drawPath(_path, paintCurr);
-    this._drawText(canvasBitMap, "这是current page");
-    _canvas.drawPicture(picRecorder.endRecording());
+    this._drawText2(canvasBitMap, "这是current page");
+    ui.Picture pic = picRecorder.endRecording();
     _canvas.clipPath(_path);
+    _canvas.drawPicture(pic);
     _canvas.restore();
   }
 
@@ -76,9 +75,10 @@ class Cover extends CustomPainter {
     _canvas.save();
     this._newPicRecorder();
     canvasBitMap.drawPath(_path, paintNext);
-    this._drawText(canvasBitMap, "这是next page");
-    _canvas.drawPicture(picRecorder.endRecording());
+    this._drawText2(canvasBitMap, "这是next page");
+    ui.Picture pic = picRecorder.endRecording();
     _canvas.clipPath(_path);
+    _canvas.drawPicture(pic);
     _canvas.restore();
   }
 
@@ -98,27 +98,28 @@ class Cover extends CustomPainter {
   }
 
   ///利用 Paragraph 实现 _drawText
-  // void _drawText(
-  //   Canvas canvas,
-  //   String text, {
-  //   TextAlign textAlign = TextAlign.start,
-  //   Color color,
-  // }) {
-  //   ui.ParagraphBuilder pb = ui.ParagraphBuilder(ui.ParagraphStyle(
-  //     textAlign: textAlign,
-  //     fontStyle: FontStyle.normal,
-  //   ));
-  //   pb.pushStyle(ui.TextStyle(
-  //     color: color ?? Colors.black87,
-  //     fontSize: 16.0,
-  //   ));
-  //   pb.addText(text);
+  void _drawText2(
+    Canvas canvas,
+    String text, {
+    TextAlign textAlign = TextAlign.start,
+    Color color,
+  }) {
+    ui.ParagraphBuilder pb = ui.ParagraphBuilder(ui.ParagraphStyle(
+      textAlign: textAlign,
+      fontStyle: FontStyle.normal,
+    ));
+    pb.pushStyle(ui.TextStyle(
+      color: color ?? Colors.black87,
+      fontSize: 16.0,
+    ));
+    pb.addText(text);
 
-  //   ///这里需要先layout, 后面才能获取到文字高度
-  //   ui.Paragraph paragraph = pb.build()
-  //     ..layout(ui.ParagraphConstraints(width: _size.width));
-  //   canvas.drawParagraph(paragraph, Offset.zero);
-  // }
+    ///这里需要先layout, 后面才能获取到文字高度
+    ui.Paragraph paragraph = pb.build()
+      ..layout(ui.ParagraphConstraints(width: _size.width));
+    canvas.drawParagraph(paragraph, Offset.zero);
+    print('textPainter.size ${paragraph.height} ${paragraph.longestLine}');
+  }
 
   Path _getViewPath() {
     _path
